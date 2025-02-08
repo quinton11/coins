@@ -38,9 +38,21 @@ enum GameMode {
 pub enum ScoreType {
     Jackpot(i32),
     Treasure(i32),
-    Splat(i32),
+    Bust(i32),
     Loss(i32),
     Robbed(i32)
+}
+
+impl ScoreType {
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            ScoreType::Jackpot(_) => "Jackpot 🎰: ",
+            ScoreType::Treasure(_) => "Treasure 💰: ",
+            ScoreType::Bust(_) => "Bust ❌: ",
+            ScoreType::Loss(_) => "Loss 😞: ",
+            ScoreType::Robbed(_) => "Robbed 💀: "
+        }
+    }
 }
 
 impl Game {
@@ -74,12 +86,12 @@ impl Game {
     ///
     /// - If the probabilities match exactly (`gap == 0`), the score remains **0**.
 
-    pub fn get_chest_score(&mut self, selection: usize) -> ScoreType {
+    pub fn get_chest_score(&mut self) -> ScoreType {
 
         let mut rng = rand::rng();
         let rand_prob:f32  = rng.random_range(0.0..1.0);
 
-        let chest_selected = self.chests[selection];
+        let chest_selected = self.chests[self.highlighted_chest as usize];
 
         // Gap between chest probability and random probability
         let gap = chest_selected - rand_prob; 
@@ -97,7 +109,7 @@ impl Game {
                 ScoreType::Loss(-1)
             }
         } else {
-            ScoreType::Splat(0)
+            ScoreType::Bust(0)
         }
     }
 
