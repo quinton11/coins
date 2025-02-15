@@ -7,8 +7,10 @@ pub struct Game {
     pub max_steps: u8,
     pub steps: u8,
     pub episode: u8,
+    pub episodes_run: u8,
     pub chests: Vec<f32>,
-    pub highlighted_chest: u8
+    pub highlighted_chest: u8,
+    pub mode: GameMode
 }
 
 impl Default for Game {
@@ -19,8 +21,10 @@ impl Default for Game {
             max_steps: 20,
             steps: 0,
             episode: 0,
+            episodes_run: 0,
             chests: vec![0.0; 8],
-            highlighted_chest: 0
+            highlighted_chest: 0,
+            mode: GameMode::Human
         };
 
         game.set_chest_probability();
@@ -29,7 +33,8 @@ impl Default for Game {
     }
 }
 
-enum GameMode {
+#[derive(Clone)]
+pub enum GameMode {
     Human,
     AgentTrain,
     AgentInfer
@@ -55,6 +60,16 @@ impl ScoreType {
     }
 }
 
+impl GameMode {
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            GameMode::Human => "Human",
+            GameMode::AgentTrain => "AgentTrain",
+            GameMode::AgentInfer => "AgentInfer"
+        }
+    }
+}
+
 impl Game {
 
     /// Set Chest's static probabilities, these do not change for now.
@@ -70,7 +85,7 @@ impl Game {
     pub fn set_chest_probability(&mut self) {
         self.chests = vec![
             -0.2,  0.35,  0.1,  0.65,
-            -0.8,  0.8,  -0.3,  -0.9,
+            -0.8,  0.9,  -0.3,  -0.9,
         ];
     }
 
@@ -119,6 +134,15 @@ impl Game {
 
     pub fn end(&mut self) {
         self.start = false;
+        self.score = 0;
+        self.steps = 0;
+        self.set_chest_probability();
+    }
+
+    pub fn reset_steps(&mut self) {
+        self.score = 0;
+        self.steps = 0;
+        self.set_chest_probability();
     }
 
     pub fn move_right(&mut self) {
@@ -130,6 +154,25 @@ impl Game {
             self.highlighted_chest = (self.chests.len() - 1) as u8;
         } else {
             self.highlighted_chest -= 1;
+        }
+    }
+
+    pub fn step(&mut self){
+        self.steps+=1;
+    }
+
+    pub fn step_episode(&mut self){
+        self.episode +=1;
+    }
+
+    pub fn game_over(&mut self) -> bool {
+        self.steps == self.max_steps
+    }
+
+    pub fn train_run_done(&mut self) -> bool {
+        match self.mode {
+            GameMode::AgentTrain => self.episode == 50,
+            _ => true
         }
     }
     

@@ -12,28 +12,6 @@ fn main() -> Result<()> {
 
     ratatui::restore();
     result
-
-    // Build terminal ui
-
-    // build game,
-
-    // Game ui should show action estimates on the left side
-
-    // Press key to start
-
-    // On start, action probabilities are set for the k-actions, they can't be the same, for k<5
-
-    // Then each "round" represents an action press, then reward reception
-
-    // Could be multiple rounds
-
-    // Game is who gets to 30 points in the least possible time
-
-    // Create menu option for model to play
-
-    // Model plays and updates action estimates based on cumulative average of rewards
-
-    // As model keeps on playing the assumption is its estimate  keeps improving
 }
 
 
@@ -42,9 +20,17 @@ fn main() -> Result<()> {
 // Implement Menu layout as Widget
 // Implement Menu selection as StatefulWidget
 
-// play - human mode
+// play - human mode - DONE
 
-// train
+// train - NEXT - Implement Model Menu With Training, and Storing of weights - DONE
+// User can select number of episodes to run for
+// When episodes are not done, agent's select action will keep getting called to select an action
+// Make it so that user can watch the model select actions
+// Now when episode is done, we store the stats in the csv for viewing
+
+// NEXT - Stats Page
+// Then on the stats page, you can see the model's stats over time/episodes
+// Then for the stats page we display the records kept in the csv. How do we render it? Barcharts? Stat graphs?
 //   - model mode
 //   - we store the k-distribution of probabilities, then the model's weights then the model's weights progression over training episodes
 
