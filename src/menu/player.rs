@@ -94,7 +94,7 @@ impl Player {
         self.score = 0;
         self.score_count = ScoreCount::default();
         self.value_estimates = vec![0.0;8];
-        self.action_selections.clear();
+        self.action_selections = vec![0;20]
 
     }
 
