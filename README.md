@@ -50,6 +50,9 @@ In this mode, you take control and play the game yourself. You have 20 steps per
 
 Your goal is to learn which actions yield the best rewards over time. The stats screen on the right updates in real-time, showing the estimated value of each action based on your experience.
 
+<img width="1800" alt="Screenshot 2025-02-16 at 8 47 55 PM" src="https://github.com/user-attachments/assets/e25d720d-285d-4351-b3c7-4c48327871bd" />
+
+
 ### 2. Model - Training Mode
 
 This mode trains a model using an epsilon-greedy strategy to solve the multi-armed bandit problem. Here’s how it works:
@@ -59,6 +62,8 @@ With a probability of `1 - epsilon`, the model selects the action with the highe
 With a probability of `epsilon`, it selects a random action to explore and gather more information.
 
 As the model plays more episodes, the value of epsilon decays, meaning it explores less and exploits more. The learning rate also decays over time to stabilize the action estimates.
+
+
 
 ### 3. Stats - Training Statistics
 
@@ -70,9 +75,10 @@ The Stats menu provides insights into the model’s training history. You can vi
 
 - Score Progress: The model’s performance improvement over time.
 
-For example, after 150 episodes, you might notice that Action 5 has the highest estimated value (around 1.2), while Action 7 has the lowest, making it the least favorable choice.
+<img width="1800" alt="Screenshot 2025-02-16 at 9 14 05 PM" src="https://github.com/user-attachments/assets/6cc2bf5d-e52c-4464-9f29-28a8d166f1ad" />
+
 
 ## 📖 Learn More
 
-To understand the intuition behind this project and the concepts of Reinforcement Learning, check out my Medium article:
-👉 The Intuition Behind Value Evaluation in Reinforcement Learning
+To understand the intuition behind this project:
+👉 [The Intuition Behind Value Evaluation in Reinforcement Learning](https://medium.com/@quintons831/the-intuition-behind-value-evaluation-in-rl-c14110f282b9)
