@@ -129,6 +129,10 @@ impl Game {
     }
 
     pub fn start(&mut self) {
+        if self.start {
+            return
+        }
+
         self.start=true;
     }
 
@@ -174,6 +178,12 @@ impl Game {
             GameMode::AgentTrain => self.episode == 50,
             _ => true
         }
+    }
+
+    pub fn reset_episode(&mut self){
+        self.episodes_run+=self.episode;
+        self.episode = 0
+
     }
     
     

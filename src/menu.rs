@@ -3,14 +3,14 @@ use std::{fs::{metadata, File, OpenOptions}, io::{BufRead, BufReader}, time::Dur
 use color_eyre::eyre::Result;
 use game::{Game, GameMode, ScoreType};
 use player::{Player, ScoreCount};
-use ratatui::{ layout::{Constraint, Direction, Layout}, 
+use ratatui::{ layout::{ Constraint, Direction, Layout}, 
 prelude::{Buffer, Rect}, style::{Color, Modifier, Style}, symbols::border, 
-text::{Line, Span}, widgets::{Block, Borders, Padding, Paragraph, StatefulWidget, Widget}, 
+text::{Line, Span}, widgets::{Axis,BarChart, Block, Borders, Chart, Padding, Paragraph, StatefulWidget, Widget}, 
 DefaultTerminal, Frame,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use csv::{self, WriterBuilder};
-use stats::EpisodeEntry;
+use stats::{EpisodeEntry, StatRecords};
 
 use crate::constant;
 
@@ -30,6 +30,7 @@ pub struct Menu {
     pub game: Game,
     pub player: Player,
     pub saved: bool,
+    pub records: StatRecords
 }
 
 impl Default for Menu{
@@ -44,7 +45,8 @@ impl Default for Menu{
             highlighted: 0,
             game : Game::default(),
             player: Player::default(),
-            saved: false }
+            saved: false,
+            records: StatRecords::default() }
     }
 }
 
@@ -114,6 +116,7 @@ impl StatefulWidget for &mut Menu{
             MenuPage::Main => self.spawn_main_menu(layout[1], buf),
             MenuPage::Play => self.spawn_play_screen(layout[1], buf),
             MenuPage::Model => self.spawn_model_screen(layout[1], buf),
+            MenuPage::Stats => self.spawn_stats_screen(layout[1], buf),
             _ => ()
         }
     }
@@ -196,19 +199,6 @@ impl Menu {
 
 
         self.spawn_stat_screen(horizontal_right, buf);
-
-        // on start of game, load model weights based on game mode selected
-        // When that is implemented then move on to the model implementation and game play
-
-        // Then work on model training which allows cpu to choose actions based on a policy
-        // Before playing we can set the number of episodes it can run, then after the end we save the data in a file. We can also ask to input the learning rate
-        // Then we simulate and test
-        // Then build the stats page to show the episodes count annd the value estimates as it increases
-        // Then we can also see the agents action selection as time progresses.
-        // Meaning we store the agents action selections, i.e the chests that it selected during episodes
-        // we save the episode number, i.e after 20 episodes
-        // It stores separate records for each different learning rate
-
     }
 
 
@@ -246,18 +236,114 @@ impl Menu {
 
 
         self.spawn_stat_screen(horizontal_right, buf);
+    }
 
-        // on start of game, load model weights based on game mode selected
-        // When that is implemented then move on to the model implementation and game play
 
-        // Then work on model training which allows cpu to choose actions based on a policy
-        // Before playing we can set the number of episodes it can run, then after the end we save the data in a file. We can also ask to input the learning rate
-        // Then we simulate and test
-        // Then build the stats page to show the episodes count annd the value estimates as it increases
-        // Then we can also see the agents action selection as time progresses.
-        // Meaning we store the agents action selections, i.e the chests that it selected during episodes
-        // we save the episode number, i.e after 20 episodes
-        // It stores separate records for each different learning rate
+    pub fn spawn_stats_screen(&mut self, area: Rect, buf: &mut Buffer) {
+
+        if !self.records.has_records {
+            let no_records_text = Line::from(vec![
+                Span::raw(" No Model Records To Display Yet 😞.. Visit the "),
+                Span::styled(
+                    "Train",
+                    Style::default()
+                        .fg(Color::Red)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(
+                    " menu to generate some! "
+                )
+            ]);
+
+            let no_records_display = Paragraph::new(no_records_text)
+            .centered()
+            .block(Block::new().borders(Borders::TOP).padding(Padding::new(0, 0, area.height/2, 0)));
+    
+            no_records_display.render(area, buf);
+            return
+        }
+
+        let layouts = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(vec![Constraint::Percentage(60), Constraint::Percentage(40)])
+        .split(area);
+
+        let right = layouts[1];
+
+        let right_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(right);
+
+        let left = layouts[0];
+        let right_top = right_layout[0];
+        let right_bottom = right_layout[1];
+
+
+        // Top Right - Show Outcome Breakdown
+        let total_outcomes = 100;
+        let outcome_data = self.records.normalized_outcome_breakdown();
+
+        let outcome_bar_chart = BarChart::default()
+            .block(Block::default().borders(Borders::ALL).title("Score Outcome Breakdown (%)"))
+            .bar_width(13) 
+            .data(&outcome_data) 
+            .max(total_outcomes) 
+            .style(Style::default().fg(Color::Green));
+
+
+        // Informatics: Value Estimates Over Time
+        let middle_text = Paragraph::new("Informatics")
+        .centered()
+        .block(Block::new().borders(Borders::ALL));
+
+        // Left Section: Line Chart: Value Estimates Over Time
+        let chart_data = self.records.prepare_value_estimates_chart();
+        let x_bounds = chart_data.1;
+        let y_bounds = chart_data.2;
+        let line_chart = Chart::new(chart_data.0)
+            .block(Block::default().borders(Borders::ALL).title("Value Estimates Over Time"))
+            .x_axis(Axis::default()
+            .title("Episode")
+            .bounds(x_bounds)
+            .labels(vec![
+                Span::raw(format!("{}", x_bounds[0] as i32)), 
+                Span::raw(format!("{}", ((x_bounds[1] - x_bounds[0]) * 0.25 + x_bounds[0]) as i32)),  // 25% mark
+                Span::raw(format!("{}", ((x_bounds[1] - x_bounds[0]) * 0.50 + x_bounds[0]) as i32)),  // 50% (Mid)
+                Span::raw(format!("{}", ((x_bounds[1] - x_bounds[0]) * 0.75 + x_bounds[0]) as i32)),  // 75% mark
+                Span::raw(format!("{}", x_bounds[1] as i32))
+            ])
+            )
+            .y_axis(Axis::default()
+                .title("Estimate")
+                .bounds(y_bounds)
+                .labels(vec![
+                    Span::raw(format!("{:.1}", y_bounds[0])),  // -2.5
+                    Span::raw(format!("{:.1}", y_bounds[0] + (y_bounds[1] - y_bounds[0]) / 4.0)),  // -1.25
+                    Span::raw(format!("{:.1}", y_bounds[0] + (y_bounds[1] - y_bounds[0]) / 2.0)),  // 0.0
+                    Span::raw(format!("{:.1}", y_bounds[0] + 3.0 * (y_bounds[1] - y_bounds[0]) / 4.0)),  // 1.25
+                    Span::raw(format!("{:.1}", y_bounds[1])),  // 2.5
+                ])
+            );
+
+
+        // Bottom Right: - Bar Chart: Score Progress Over Time
+        let bar_data = self.records.recent_score_progress();
+
+    
+        let bar_chart = ratatui::widgets::BarChart::default()
+        .block(Block::default().borders(Borders::ALL).title("Score Progress (Recent Multiples of 5 Episodes)"))
+        .data(&bar_data.iter().map(|(s, v)| (s.as_str(), *v)).collect::<Vec<_>>())
+        .bar_width(13)  
+        .max(50)
+        .style(Style::default().fg(Color::Yellow));
+
+
+        middle_text.render(left, buf);
+
+        line_chart.render(left, buf);
+        outcome_bar_chart.render(right_top, buf);
+        bar_chart.render(right_bottom, buf);
     }
 
     pub fn spawn_game_over_screen(&mut self, area: Rect, buf: &mut Buffer) {
@@ -528,6 +614,7 @@ impl Menu {
 
                 if self.game.train_run_done(){
                     self.game.start = false;
+                    self.game.reset_episode();
                     continue;
                 }
 
@@ -557,24 +644,6 @@ impl Menu {
     }
 
     pub fn handle_event(&mut self) -> Result<()> {
-
-        // if let Ok(event) = event::read() {
-        //     match event {
-        //         Event::Key(KeyEvent { code, .. }) => match code {
-        //             KeyCode::Down => self.down(),
-        //             KeyCode::Up => self.up(),
-        //             KeyCode::Enter => self.handle_enter(),
-        //             KeyCode::Esc => self.handle_escape(),
-        //             KeyCode::Char('s') => if matches!(self.page, MenuPage::Play) || matches!(self.page, MenuPage::Model) { self.game.start(); },
-        //             KeyCode::Left => if matches!(self.page, MenuPage::Play) { self.game.move_left(); },
-        //             KeyCode::Right => if matches!(self.page, MenuPage::Play) { self.game.move_right(); },
-        //             KeyCode::Char('c') => self.handle_reset(),
-        //             KeyCode::Char('q') => self.handle_quit(),
-        //             _ => (),s
-        //         },
-        //         _ => (),
-        //     }
-        // }
 
         if event::poll(Duration::from_millis(100))? { 
             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
@@ -624,9 +693,12 @@ impl Menu {
         }
     }
 
-    fn handle_escape(&mut self) {
+    fn handle_escape(&mut self)  {
         match self.page {
-            MenuPage::Main => std::process::exit(0),
+            MenuPage::Main => {
+                ratatui::restore();
+                std::process::exit(0)
+            },
             MenuPage::Play => {
                 self.page = MenuPage::Main;
                 self.game.end();
@@ -636,6 +708,9 @@ impl Menu {
                 self.page = MenuPage::Main;
                 self.game.end();
                 self.player.zero_out_all();
+            }
+            MenuPage::Stats => {
+                self.page = MenuPage::Main;
             }
             _ => (),
         }
@@ -729,6 +804,16 @@ impl Menu {
                             self.game.episodes_run = stat.episode as u8;
                         }
                     },
+                    Err(_) => ()
+                }
+            }
+            MenuPage::Stats => {
+                // load entries list, if none, set has_records to false
+                self.game.mode = GameMode::AgentTrain;
+                let result = self.fetch_stat_records();
+
+                match result {
+                    Ok(()) => (),
                     Err(_) => ()
                 }
             }
@@ -852,5 +937,69 @@ impl Menu {
         }
 
         Ok((false, EpisodeEntry::default()))
+    }
+
+
+    pub fn fetch_stat_records(&mut self) -> std::io::Result<()> {
+        let filename = format!("{}_stats.csv",self.game.mode.to_string());
+        let file_exists = metadata(filename.clone()).is_ok();
+
+        if !file_exists {
+            return Ok(())
+        }
+
+        let mut episode_entries: Vec<EpisodeEntry> = Vec::new();
+
+        let file = File::open(filename.clone())?;
+
+        let mut csv_reader = csv::ReaderBuilder::new()
+        .has_headers(true) 
+        .flexible(true)
+        .from_reader(file);
+
+        let mut row_count = 0;
+
+        for result in csv_reader.records() {
+            row_count += 1;
+
+            if let Ok(record) = result {
+
+                let episode = record[0].parse::<u32>().unwrap_or(0);
+                let score = record[1].parse::<i32>().unwrap_or(0);
+                let steps = record[2].parse::<u32>().unwrap_or(0);
+
+                let estimates: Vec<f32> = serde_json::from_str(&record[3]).unwrap_or_else(|e| {
+                    println!("Error parsing estimates at row {}: {}, content: {:?}", row_count, e, &record[3]);
+                    vec![0.0; 8]
+                });
+
+                let breakdown: ScoreCount = serde_json::from_str(&record[4]).unwrap_or_else(|e| {
+                    println!("Error parsing breakdown at row {}: {}, content: {:?}", row_count, e, &record[4]);
+                    ScoreCount { jackpot: 0, treasure: 0, bust: 0, loss: 0, robbed: 0 }
+                });
+
+                let action_selections: Vec<u8> = serde_json::from_str(&record[5]).unwrap_or_else(|e| {
+                    println!("Error parsing action selections at row {}: {}, content: {:?}", row_count, e, &record[5]);
+                    vec![0; 20]
+                });
+
+                let entry = EpisodeEntry {
+                    episode,
+                    score,
+                    steps,
+                    estimates,
+                    breakdown,
+                    learning_rate: 0.1,
+                    action_selections,
+                };
+
+                episode_entries.push(entry);
+            }
+        }
+
+        self.records.entries = episode_entries;
+        self.records.has_records = true;
+
+        return Ok(())
     }
 }
